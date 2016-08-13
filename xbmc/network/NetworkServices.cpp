@@ -829,18 +829,13 @@ bool CNetworkServices::StartUPnP()
   ret |= StartUPnPClient();
   if (CSettings::GetInstance().GetBool(CSettings::SETTING_SERVICES_UPNPSERVER))
   {
-   ret |= StartUPnPServer();
-  }
-
-  if (CSettings::GetInstance().GetBool(CSettings::SETTING_SERVICES_UPNPCONTROLLER))
-  {
-    ret |= StartUPnPController();
+    ret |= StartUPnPServer();
+    if (CSettings::GetInstance().GetBool(CSettings::SETTING_SERVICES_UPNPCONTROLLER))
+      ret |= StartUPnPController();
   }
 
   if (CSettings::GetInstance().GetBool(CSettings::SETTING_SERVICES_UPNPRENDERER))
-  {
     ret |= StartUPnPRenderer();
-  }
 #endif // HAS_UPNP
   return ret;
 }
