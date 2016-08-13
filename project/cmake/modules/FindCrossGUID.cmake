@@ -6,6 +6,7 @@ if(ENABLE_INTERNAL_CROSSGUID)
   string(SUBSTRING "${CGUID_VER}" 8 -1 CGUID_VER)
 
   set(CROSSGUID_LIBRARY ${CMAKE_BINARY_DIR}/${CORE_BUILD_DIR}/lib/libcrossguid.a)
+  set(CROSSGUID_INCLUDE_DIR ${CMAKE_BINARY_DIR}/${CORE_BUILD_DIR}/include)
   externalproject_add(crossguid
                       URL http://mirrors.kodi.tv/build-deps/sources/crossguid-${CGUID_VER}.tar.gz
                       PREFIX ${CORE_BUILD_DIR}/crossguid
@@ -21,16 +22,17 @@ if(ENABLE_INTERNAL_CROSSGUID)
                                     ${CORE_SOURCE_DIR}/tools/depends/target/crossguid/FindCXX11.cmake
                                     <SOURCE_DIR>
                       BUILD_BYPRODUCTS ${CROSSGUID_LIBRARY})
-
-  set(CROSSGUID_FOUND 1)
-  set(CROSSGUID_LIBRARIES ${CROSSGUID_LIBRARY})
-  set(CROSSGUID_INCLUDE_DIRS ${CMAKE_BINARY_DIR}/${CORE_BUILD_DIR}/include)
+  set_target_properties(crossguid PROPERTIES FOLDER "External Projects")
 
   include(FindPackageHandleStandardArgs)
-  find_package_handle_standard_args(CROSSGUID DEFAULT_MSG CROSSGUID_INCLUDE_DIRS CROSSGUID_LIBRARIES)
-  mark_as_advanced(CROSSGUID_INCLUDE_DIRS CROSSGUID_LIBRARIES CROSSGUID_DEFINITIONS CROSSGUID_FOUND)
+  find_package_handle_standard_args(CrossGuid
+                                    REQUIRED_VARS CROSSGUID_LIBRARY CROSSGUID_INCLUDE_DIR
+                                    VERSION_VAR CGUID_VER)
+
+  set(CROSSGUID_LIBRARIES ${CROSSGUID_LIBRARY})
+  set(CROSSGUID_INCLUDE_DIRS ${CROSSGUID_INCLUDE_DIR})
 else()
-  find_path(CROSSGUID_INCLUDE_DIR guid.h)
+  find_path(CROSSGUID_INCLUDE_DIR NAMES guid.h)
 
   find_library(CROSSGUID_LIBRARY_RELEASE NAMES crossguid)
   find_library(CROSSGUID_LIBRARY_DEBUG NAMES crossguidd)
@@ -39,12 +41,15 @@ else()
   select_library_configurations(CROSSGUID)
 
   include(FindPackageHandleStandardArgs)
-  find_package_handle_standard_args(CROSSGUID
+  find_package_handle_standard_args(CrossGuid
                                     REQUIRED_VARS CROSSGUID_LIBRARY CROSSGUID_INCLUDE_DIR)
 
   if(CROSSGUID_FOUND)
     set(CROSSGUID_LIBRARIES ${CROSSGUID_LIBRARY})
     set(CROSSGUID_INCLUDE_DIRS ${CROSSGUID_INCLUDE_DIR})
+
+    add_custom_target(crossguid)
+    set_target_properties(crossguid PROPERTIES FOLDER "External Projects")
   endif()
   mark_as_advanced(CROSSGUID_INCLUDE_DIR CROSSGUID_LIBRARY)
 endif()

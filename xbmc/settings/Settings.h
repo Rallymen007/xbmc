@@ -260,6 +260,7 @@ public:
   static const std::string SETTING_SLIDESHOW_STAYTIME;
   static const std::string SETTING_SLIDESHOW_DISPLAYEFFECTS;
   static const std::string SETTING_SLIDESHOW_SHUFFLE;
+  static const std::string SETTING_SLIDESHOW_HIGHQUALITYDOWNSCALING;
   static const std::string SETTING_WEATHER_CURRENTLOCATION;
   static const std::string SETTING_WEATHER_ADDON;
   static const std::string SETTING_WEATHER_ADDONSETTINGS;
@@ -328,6 +329,8 @@ public:
   static const std::string SETTING_INPUT_PERIPHERALS;
   static const std::string SETTING_INPUT_ENABLEMOUSE;
   static const std::string SETTING_INPUT_CONTROLLERCONFIG;
+  static const std::string SETTING_INPUT_TESTRUMBLE;
+  static const std::string SETTING_INPUT_CONTROLLERPOWEROFF;
   static const std::string SETTING_INPUT_APPLEREMOTEMODE;
   static const std::string SETTING_INPUT_APPLEREMOTEALWAYSON;
   static const std::string SETTING_INPUT_APPLEREMOTESEQUENCETIME;
@@ -370,6 +373,9 @@ public:
   static const std::string SETTING_ADDONS_ALLOW_UNKNOWN_SOURCES;
   static const std::string SETTING_GENERAL_ADDONFOREIGNFILTER;
   static const std::string SETTING_GENERAL_ADDONBROKENFILTER;
+  static const std::string SETTING_SOURCE_VIDEOS;
+  static const std::string SETTING_SOURCE_MUSIC;
+  static const std::string SETTING_SOURCE_PICTURES;
 
   /*!
    \brief Creates a new settings wrapper around a new settings manager.

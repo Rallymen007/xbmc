@@ -9,6 +9,7 @@ set(SOURCES AEFactory.cpp
             Encoders/AEEncoderFFmpeg.cpp
             Engines/ActiveAE/ActiveAE.cpp
             Engines/ActiveAE/ActiveAEBuffer.cpp
+            Engines/ActiveAE/ActiveAEFilter.cpp
             Engines/ActiveAE/ActiveAESink.cpp
             Engines/ActiveAE/ActiveAEStream.cpp
             Engines/ActiveAE/ActiveAESound.cpp
@@ -33,6 +34,7 @@ set(HEADERS AEFactory.h
             Encoders/AEEncoderFFmpeg.h
             Engines/ActiveAE/ActiveAE.h
             Engines/ActiveAE/ActiveAEBuffer.h
+            Engines/ActiveAE/ActiveAEFilter.h
             Engines/ActiveAE/ActiveAESink.h
             Engines/ActiveAE/ActiveAESound.h
             Engines/ActiveAE/ActiveAEStream.h
@@ -129,6 +131,5 @@ if(CORE_SYSTEM_NAME STREQUAL freebsd)
   list(APPEND HEADERS Sinks/AESinkOSS.h)
 endif()
 
-include_directories(${CMAKE_CURRENT_SOURCE_DIR})
-
 core_add_library(audioengine)
+target_include_directories(${CORE_LIBRARY} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})

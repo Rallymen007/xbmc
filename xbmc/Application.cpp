@@ -387,9 +387,14 @@ extern "C" void __stdcall cleanup_emu_environ();
 // Utility function used to copy files from the application bundle
 // over to the user data directory in Application Support/Kodi.
 //
-static void CopyUserDataIfNeeded(const std::string &strPath, const std::string &file)
+static void CopyUserDataIfNeeded(const std::string &strPath, const std::string &file, const std::string &destname = "")
 {
-  std::string destPath = URIUtils::AddFileToFolder(strPath, file);
+  std::string destPath;
+  if (destname == "")
+    destPath = URIUtils::AddFileToFolder(strPath, file);
+  else
+    destPath = URIUtils::AddFileToFolder(strPath, destname);
+  
   if (!CFile::Exists(destPath))
   {
     // need to copy it across
@@ -469,7 +474,12 @@ bool CApplication::Create()
   win32_exception::install_handler();
 
 #endif
-
+  
+  #if defined(TARGET_POSIX)
+    // set special://envhome
+    CSpecialProtocol::SetEnvHomePath(getenv("HOME"));
+  #endif
+    
   // only the InitDirectories* for the current platform should return true
   bool inited = InitDirectoriesLinux();
   if (!inited)
@@ -481,6 +491,10 @@ bool CApplication::Create()
   CopyUserDataIfNeeded("special://masterprofile/", "RssFeeds.xml");
   CopyUserDataIfNeeded("special://masterprofile/", "favourites.xml");
   CopyUserDataIfNeeded("special://masterprofile/", "Lircmap.xml");
+  
+  #ifdef TARGET_DARWIN_IOS
+    CopyUserDataIfNeeded("special://masterprofile/", "iOS/sources.xml", "sources.xml");
+  #endif
 
   if (!CLog::Init(CSpecialProtocol::TranslatePath("special://logpath").c_str()))
   {
@@ -540,7 +554,7 @@ bool CApplication::Create()
       CLog::Log(LOGNOTICE, "WARNING: unsupported ffmpeg version detected");
   }
 #endif
-  
+
   std::string cpuModel(g_cpuInfo.getCPUModel());
   if (!cpuModel.empty())
     CLog::Log(LOGNOTICE, "Host CPU: %s, %d core%s available", cpuModel.c_str(), g_cpuInfo.getCPUCount(), (g_cpuInfo.getCPUCount() == 1) ? "" : "s");
@@ -580,8 +594,7 @@ bool CApplication::Create()
   CRegExp::LogCheckUtf8Support();
   CLog::Log(LOGNOTICE, "-----------------------------------------------------------------------");
 
-  std::string strExecutablePath;
-  CUtil::GetHomePath(strExecutablePath);
+  std::string strExecutablePath = CUtil::GetHomePath();
 
   // for python scripts that check the OS
 #if defined(TARGET_DARWIN)
@@ -859,7 +872,7 @@ bool CApplication::InitDirectoriesLinux()
   else
     userHome = "/root";
 
-  std::string appBinPath, appPath;
+  std::string appPath;
   std::string appName = CCompileInfo::GetAppName();
   std::string dotLowerAppName = "." + appName;
   StringUtils::ToLower(dotLowerAppName);
@@ -867,18 +880,20 @@ bool CApplication::InitDirectoriesLinux()
   const char* envAppBinHome = "KODI_BIN_HOME";
   const char* envAppTemp = "KODI_TEMP";
 
-  CUtil::GetHomePath(appBinPath, envAppBinHome);
+  auto appBinPath = CUtil::GetHomePath(envAppBinHome);
+  // overridden by user
   if (getenv(envAppHome))
     appPath = getenv(envAppHome);
   else
   {
-    appPath = appBinPath;
+    // use build time default
+    appPath = INSTALL_PATH;
     /* Check if binaries and arch independent data files are being kept in
      * separate locations. */
     if (!CDirectory::Exists(URIUtils::AddFileToFolder(appPath, "userdata")))
     {
       /* Attempt to locate arch independent data files. */
-      CUtil::GetHomePath(appPath);
+      appPath = CUtil::GetHomePath(appBinPath);
       if (!CDirectory::Exists(URIUtils::AddFileToFolder(appPath, "userdata")))
       {
         fprintf(stderr, "Unable to find path to %s data files!\n", appName.c_str());
@@ -926,6 +941,11 @@ bool CApplication::InitDirectoriesLinux()
     CSpecialProtocol::SetLogPath(strTempPath);
     CreateUserDirs();
   }
+  CSpecialProtocol::SetXBMCBinAddonPath(appBinPath + "/addons");
+
+#if defined(TARGET_ANDROID)
+  CXBMCApp::InitDirectories();
+#endif
 
   return true;
 #else
@@ -948,8 +968,7 @@ bool CApplication::InitDirectoriesOSX()
   else
     userHome = "/root";
 
-  std::string appPath;
-  CUtil::GetHomePath(appPath);
+  std::string appPath = CUtil::GetHomePath();
   setenv("KODI_HOME", appPath.c_str(), 0);
 
 #if defined(TARGET_DARWIN_IOS)
@@ -1012,7 +1031,7 @@ bool CApplication::InitDirectoriesOSX()
     CSpecialProtocol::SetTempPath(strTempPath);
     CSpecialProtocol::SetLogPath(strTempPath);
   }
-
+  CSpecialProtocol::SetXBMCBinAddonPath(appPath + "/addons");
   return true;
 #else
   return false;
@@ -1022,12 +1041,11 @@ bool CApplication::InitDirectoriesOSX()
 bool CApplication::InitDirectoriesWin32()
 {
 #ifdef TARGET_WINDOWS
-  std::string xbmcPath;
-
-  CUtil::GetHomePath(xbmcPath);
+  std::string xbmcPath = CUtil::GetHomePath();
   CEnvironment::setenv("KODI_HOME", xbmcPath);
   CSpecialProtocol::SetXBMCBinPath(xbmcPath);
   CSpecialProtocol::SetXBMCPath(xbmcPath);
+  CSpecialProtocol::SetXBMCBinAddonPath(xbmcPath + "/addons");
 
   std::string strWin32UserFolder = CWIN32Util::GetProfilePath();
   CSpecialProtocol::SetLogPath(strWin32UserFolder);
@@ -1059,8 +1077,10 @@ void CApplication::CreateUserDirs() const
 
   //Let's clear our archive cache before starting up anything more
   auto archiveCachePath = CSpecialProtocol::TranslatePath("special://temp/archive_cache/");
-  CDirectory::Remove(archiveCachePath);
-  CDirectory::Create(archiveCachePath);
+  if (CDirectory::RemoveRecursive(archiveCachePath))
+    CDirectory::Create(archiveCachePath);
+  else
+    CLog::Log(LOGWARNING, "Failed to remove the archive cache at %s", archiveCachePath.c_str());
 
 }
 
@@ -1447,6 +1467,18 @@ void CApplication::OnSettingAction(const CSetting *setting)
     g_windowManager.ActivateWindow(WINDOW_SCREEN_CALIBRATION);
   else if (settingId == CSettings::SETTING_VIDEOSCREEN_TESTPATTERN)
     g_windowManager.ActivateWindow(WINDOW_TEST_PATTERN);
+  else if (settingId == CSettings::SETTING_SOURCE_VIDEOS)
+  {
+    std::vector<std::string> params{"library://video/files.xml", "return"};
+    g_windowManager.ActivateWindow(WINDOW_VIDEO_NAV, params);
+  }
+  else if (settingId == CSettings::SETTING_SOURCE_MUSIC)
+  {
+    std::vector<std::string> params{"library://music/files.xml", "return"};
+    g_windowManager.ActivateWindow(WINDOW_MUSIC_NAV, params);
+  }
+  else if (settingId == CSettings::SETTING_SOURCE_PICTURES)
+    g_windowManager.ActivateWindow(WINDOW_PICTURES);
 }
 
 bool CApplication::OnSettingUpdate(CSetting* &setting, const char *oldSettingId, const TiXmlNode *oldSettingNode)
@@ -2186,22 +2218,25 @@ bool CApplication::OnAction(const CAction &action)
     {
       if (action.GetID() == ACTION_PLAYER_FORWARD || action.GetID() == ACTION_PLAYER_REWIND)
       {
-        int iPlaySpeed = m_pPlayer->GetPlaySpeed();
-        if (action.GetID() == ACTION_PLAYER_REWIND && iPlaySpeed == 1) // Enables Rewinding
-          iPlaySpeed *= -2;
-        else if (action.GetID() == ACTION_PLAYER_REWIND && iPlaySpeed > 1) //goes down a notch if you're FFing
-          iPlaySpeed /= 2;
-        else if (action.GetID() == ACTION_PLAYER_FORWARD && iPlaySpeed < 1) //goes up a notch if you're RWing
-          iPlaySpeed /= 2;
+        float playSpeed = m_pPlayer->GetPlaySpeed();
+        if (playSpeed >= 0.75 && playSpeed <= 1.55)
+          playSpeed = 1;
+
+        if (action.GetID() == ACTION_PLAYER_REWIND && (playSpeed = 1)) // Enables Rewinding
+          playSpeed *= -2;
+        else if (action.GetID() == ACTION_PLAYER_REWIND && playSpeed > 1) //goes down a notch if you're FFing
+          playSpeed /= 2;
+        else if (action.GetID() == ACTION_PLAYER_FORWARD && playSpeed < 1) //goes up a notch if you're RWing
+          playSpeed /= 2;
         else
-          iPlaySpeed *= 2;
+          playSpeed *= 2;
 
-        if (action.GetID() == ACTION_PLAYER_FORWARD && iPlaySpeed == -1) //sets iSpeed back to 1 if -1 (didn't plan for a -1)
-          iPlaySpeed = 1;
-        if (iPlaySpeed > 32 || iPlaySpeed < -32)
-          iPlaySpeed = 1;
+        if (action.GetID() == ACTION_PLAYER_FORWARD && playSpeed == -1) //sets iSpeed back to 1 if -1 (didn't plan for a -1)
+          playSpeed = 1;
+        if (playSpeed > 32 || playSpeed < -32)
+          playSpeed = 1;
 
-        m_pPlayer->SetPlaySpeed(iPlaySpeed);
+        m_pPlayer->SetPlaySpeed(playSpeed);
         return true;
       }
       else if ((action.GetAmount() || m_pPlayer->GetPlaySpeed() != 1) && (action.GetID() == ACTION_ANALOG_REWIND || action.GetID() == ACTION_ANALOG_FORWARD))
@@ -3640,7 +3675,7 @@ void CApplication::OnPlayBackSeek(int iTime, int seekOffset)
   CJSONUtils::MillisecondsToTimeObject(iTime, param["player"]["time"]);
   CJSONUtils::MillisecondsToTimeObject(seekOffset, param["player"]["seekoffset"]);
   param["player"]["playerid"] = g_playlistPlayer.GetCurrentPlaylist();
-  param["player"]["speed"] = m_pPlayer->GetPlaySpeed();
+  param["player"]["speed"] = (int)m_pPlayer->GetPlaySpeed();
   CAnnouncementManager::GetInstance().Announce(Player, "xbmc", "OnSeek", m_itemCurrentFile, param);
   g_infoManager.SetDisplayAfterSeek(2500, seekOffset);
 }
